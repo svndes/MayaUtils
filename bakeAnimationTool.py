@@ -1,6 +1,18 @@
-# Bake Animation Tool makes animation baking easy.
-# It bakes selected objects and channel box attributes.
-# Adjust frame ranges, sampling rates, and shape node options as needed.
+# Bake Animation Tool: Simplify Maya Animation Baking
+#
+# This tool bakes animations onto selected objects and attributes in Maya. It offers
+# flexible frame range options, adjustable sample rates, and the ability to include shape nodes.
+#
+# Key Features:
+# 1. Frame Range: Playback, full, or custom start/end frames.
+# 2. Sampling Rate: Set how often keyframes are created.
+# 3. Shape Nodes: Option to bake shape node attributes.
+# 4. Channel Box Support: Bake selected attributes or all by default.
+#
+# Author: Sandesh Chakradhar
+# GitHub: https://github.com/svndes
+# Contact: svndes@gmail.com
+
 import maya.cmds as cmds
 from PySide2.QtWidgets import *
 from PySide2.QtCore import Qt
