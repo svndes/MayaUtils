@@ -1,0 +1,219 @@
+import pymel.core as pm
+import maya.cmds as cmds
+from functools import partial
+
+def copySkinWeight(*args):
+    sel = pm.ls(sl=True)
+    shapes = pm.listRelatives(sel[0], shapes=True)
+    # print shapes
+    for shape in shapes:
+        print(shape)
+        try:
+            skin = pm.listHistory(shape, type="skinCluster")[0]
+            if skin:
+                break
+        except:
+            print("skinCluster error")
+    # print skin
+    jointList = pm.skinCluster(skin, q=True, inf=True)
+    for i in range(1, (len(sel))):
+        print('aa')
+        skin2 = pm.skinCluster(jointList, sel[i], bindMethod=0, normalizeWeights=1,  mi = 5, tsb=True)
+        pm.copySkinWeights(ss=skin, ds=skin2, noMirror=True, surfaceAssociation="closestPoint",
+                           influenceAssociation=["name", "name", "name"])
+    print('skinCluster transfer completed')
+
+def grpToGrpCopySkinWeight(*args):
+    sel = pm.ls(sl=True)
+    skinned = []
+    for i in sel:
+        print(i)
+        skin = pm.listConnections(i, type="skinCluster")
+        if skin:
+            skinned.append(i)
+    for o in skinned:
+        skinnedMesh = pm.listRelatives(o, p=True)[0]
+        newMesh = skinnedMesh.rsplit("prefix_")[1]
+
+        if pm.objExists(newMesh):
+            print("yes")
+            pm.select(skinnedMesh, newMesh)
+            copySkinWeight()
+        else:
+            pm.error("No object found " + "prefix_")
+
+def deskin(*args):
+    import maya.mel as mel
+    mel.eval("DetachSkin;")
+
+def normaloneonone(*args):
+    import maya.mel as mel
+    mel.eval("copySkinWeights  -noMirror -surfaceAssociation closestPoint -influenceAssociation closestJoint -influenceAssociation closestBone -influenceAssociation oneToOne;")
+
+
+
+def copySkinWeightsFromOriginalMesh(*args):
+    selectedMeshes = pm.ls(sl=True)
+    meshesWithoutSkin = []
+    missingOriginalMeshes = []
+    meshesWithSkin = []
+
+    for selectedMesh in selectedMeshes:
+        meshNodeType = pm.nodeType(selectedMesh, isTypeName=True)
+        if meshNodeType == "mesh":
+            originalMeshName = f"prefix_{selectedMesh}"
+            if pm.objExists(originalMeshName):
+                originalSkinCluster = pm.listConnections(originalMeshName, type="skinCluster")[0]
+                if originalSkinCluster:
+                    """
+                    print(originalSkinCluster)
+                    print(originalMeshName)
+                    print(selectedMesh)  
+                    print("\n")
+                    """
+                    originalInfluences = pm.skinCluster(originalSkinCluster, q=True, inf=True)
+                    newSkinCluster = pm.skinCluster(originalInfluences, selectedMesh, bindMethod=0, normalizeWeights=1, mi=5, tsb=True)
+                    pm.copySkinWeights(ss=originalSkinCluster, ds=newSkinCluster, noMirror=True, surfaceAssociation="closestPoint",
+                                       influenceAssociation=["name", "name", "name"])
+                    meshesWithSkin.append((originalMeshName, selectedMesh))
+                else:
+                    meshesWithoutSkin.append((selectedMesh, "Selected node is a shape, not a transform"))
+            else:
+                parentTransform = pm.listRelatives(selectedMesh, parent=True)[0]
+                meshShape = selectedMesh
+                missingOriginalMeshes.append((parentTransform, meshShape))
+
+    # ✅ Final Summary
+    if meshesWithSkin:
+        print("\n✅ Skinned Copied:")
+        for originalMesh, newMesh in meshesWithSkin:
+            print(f"{originalMesh} >>>> {newMesh}")
+    else:
+        print("\n✅ Skinned Copied:\nNone")
+
+    if meshesWithoutSkin:
+        print("\n⚠️ Not Skinned in These Meshes:")
+        for mesh, reason in meshesWithoutSkin:
+            print(f"{mesh} >>>> {reason}")
+    else:
+        print("\n⚠️ Not Skinned in These Meshes:\nNone")
+
+    if missingOriginalMeshes:
+        print("\n❌ No Original Object Found:")
+        for parentTransform, meshShape in missingOriginalMeshes:
+            print(f"{parentTransform} >>>> {meshShape}")
+    else:
+        print("\n❌ No Original Object Found:\nNone")
+
+
+"""
+def rebindSkin(*args):
+    # Rebinds the skin of the selected mesh to its original mesh
+    oldMesh = cmds.ls(sl=True)
+    if oldMesh and len(oldMesh)== 1 :
+        newMesh = cmds.duplicate(oldMesh[0])
+        cmds.select(oldMesh[0], newMesh)
+        copySkinWeight() # custom copy skin script
+        cmds.delete(oldMesh[0])
+        cmds.select(cl=true)
+        cmds.select(newMesh)
+
+
+
+
+"""
+
+
+def rebindSkin(*args):
+    # Rebinds the skin of the selected mesh to its original mesh
+    sel = cmds.ls(sl=True)
+    if not sel or len(sel) != 1:
+        cmds.warning("Please select exactly one mesh.")
+        return
+
+    mesh = sel[0]
+
+    # Check if the selected mesh has a skinCluster attached
+    skinClusters = cmds.ls(cmds.listHistory(mesh), type='skinCluster')
+    if not skinClusters:
+        cmds.warning("Selected mesh does not have a skinCluster (skin).")
+        return
+
+    newMesh = cmds.duplicate(mesh)[0]
+    cmds.select([mesh, newMesh])
+    copySkinWeight()
+    cmds.delete(mesh)
+    cmds.select(clear=True)
+    cmds.select(newMesh)
+
+
+def copySkinUI():
+
+    import random
+    # Generate the base number
+    number = random.uniform(0.01, 0.8) / 10
+    numR = random.uniform(0.01, 0.0) / (number*number)
+    numG = random.uniform(0.01, 0.2) / (number+number)
+    numB = random.uniform(0.01, 0.2) / (number/number)
+    # Create a list of lists where each list gets different numbers
+    lists = [[number + (i + numR) * 0.05 + random.uniform(0, 0.02),
+              number + (i + numG) * 0.05 + random.uniform(0, 0.02),
+              number + (i + numB) * 0.05 + random.uniform(0, 0.02)] for i in range(9)]
+    # Unpack the lists into separate variables
+    numberA, numberB, numberC, numberD, numberE, numberF, numberG, numberH, numberI = lists
+
+    height = 60
+
+    if (cmds.window("copySkin", ex=True)):
+        cmds.deleteUI("copySkin")
+    cmds.window("copySkin", title="x_x")
+    cmds.columnLayout(adjustableColumn=True)
+    #cmds.text(l="---- SKINNING SHORTCUT ----", h=25, bgc=numberA)
+    cmds.button(l="Normal Skin Copy", w=250, h=height, bgc=numberA, c=partial(normaloneonone))
+    cmds.button(l="Copy", w=250, h=height, bgc=numberB, c=partial(copySkinWeight))
+    cmds.button(l="Copy Grp to Grp", w=250, h=height, bgc=numberC, c=partial(grpToGrpCopySkinWeight))
+
+    cmds.button(l="Copy Grp - need to select new meshs first", w=250, h=height, bgc=numberD, c=partial(copySkinWeightsFromOriginalMesh))
+
+    cmds.button(l="Unbind", w=250, h=height, bgc=numberE, c=partial(deskin))
+    cmds.button(l="Rebind skin", w=250, h=height, bgc=numberF, c=partial(rebindSkin))
+
+    cmds.button(l="lattice to skin", w=250, h=height, bgc=numberG, c=partial(copySkinWeight))
+    cmds.button(l="softmod to skin", w=250, h=height, bgc=numberH, c=partial(grpToGrpCopySkinWeight))
+    #cmds.button(l="nah", w=250, h=height, bgc=numberI, c=partial(deskin))
+    #cmds.button(l="nah", w=250, h=height, bgc=numberI, c=partial(deskin))
+
+    cmds.showWindow()
+
+
+"""
+
+import pymel.core as pm
+import maya.cmds as cmds
+from functools import partial
+import maya.mel as mel
+
+model = "*:Geometry"
+modelList = pm.listRelatives(model, ad=True, type="transform")
+
+# print(modelList)
+for i in modelList:
+    shape = pm.listRelatives(i, s=True)
+    if shape:
+        if "Orig" not in shape[0]:
+            skin = pm.listHistory(shape[0], type="skinCluster")[0]
+            if skin:
+                jointList = pm.skinCluster(skin, q=True, inf=True)
+                newMesh = i.split(":")[-1]
+                newJointList = []
+                for jj in jointList:
+                    newjj = jj.split(':')[-1]
+                    newJointList.append(newjj)
+                print(newMesh)
+                print(newJointList)
+                skin2 = pm.skinCluster(newJointList, newMesh, bindMethod=0, normalizeWeights=1, mi=5, tsb=True)
+                pm.copySkinWeights(ss=skin, ds=skin2, noMirror=True, surfaceAssociation="closestPoint",
+                                   influenceAssociation=["closestJoint", "closestBone", "oneToOne"])
+
+"""
+
